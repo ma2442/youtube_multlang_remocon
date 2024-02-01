@@ -1,0 +1,21 @@
+{
+    "manifest_version": 3,
+    "name": "Youtube多言語リモコン",
+    "description": "Youtubeの言語・場所・アカウントの切替を楽にできる。",
+    // "name": "Youtube Multi-Language Remocon",
+    // "description": "switch languages and countries on youtube",
+    "version": "0.3.0",
+
+    "action": {
+        "default_title": "Youtube多言語リモコン",
+        "default_popup": "popup.html"
+    },
+
+    "icons": {
+        "48": "icons/icon_48.png"
+    },
+
+    "permissions": ["activeTab", "scripting", "cookies", "storage"],
+
+    "host_permissions": ["https://*.youtube.com/*"]
+}
