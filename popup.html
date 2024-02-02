@@ -36,7 +36,7 @@
             margin: 10px 0px 0px 0px;
             text-align:center;
         }
-        #set_ch_disp {
+        #disp_option {
             font-size:1em;
             min-width:1em;
             min-height:1em;
@@ -48,23 +48,26 @@
     </head>
     <body>
         <h1>ペア設定</h1>
-        <button class="pair" id="ja_jp">日本語 <br />+ 日本</button>
-        <button class="pair" id="enus_us">English (US) <br />+ United States</button>
+        <button class="pair" id="pair1">日本語 <br />+ 日本</button>
+        <button class="pair" id="pair2">English (US) <br />+ United States</button>
     </br>
     <h1>アカウント切替＆リロード</h1>
         <button class="ch" id="ch1">1</button>
         <button class="ch" id="ch2">2</button>
     </br>
         <h2>個別設定・現在の設定値</h2>
-        <button class="setting" id="ja">日本語</button>
-        <button class="setting" id="enus">English (US)</button>
+        <button class="setting" id="lang1">日本語</button>
+        <button class="setting" id="lang2">English (US)</button>
     </br>
-    <button class="setting" id="jp">日本</button>
-        <button class="setting" id="us">United States</button>
+    <button class="setting" id="location1">日本</button>
+        <button class="setting" id="location2">United States</button>
     </br>
 </br></br>
-    <button id="set_ch_disp">数字ボタン設定を表示</button>
+    <button id="disp_option">ボタン割り当て設定を表示</button>
     <div id="option" hidden="true">
+        <h3>表示中の言語・場所のペアをボタンに割り当て</h3>
+        <button id="set_pair1">左ボタンに設定</button>
+            <button id="set_pair2">右ボタンに設定</button>
     <h3>表示中のアカウントを数字ボタンに割り当て</h3>
     <button id="set_ch1">1に設定</button>
         <button id="set_ch2">2に設定</button>

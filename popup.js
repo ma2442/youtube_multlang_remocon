@@ -21,23 +21,37 @@ var main = async () => {
         return getElementByIdPromise(id, triesMax - 1);
     };
 
-    let btnJaJp = await getElementByIdPromise("ja_jp", 30);
-    let btnEnusUs = await getElementByIdPromise("enus_us", 30);
-    let btnJa = await getElementByIdPromise("ja", 30);
-    let btnJp = await getElementByIdPromise("jp", 30);
-    let btnEnus = await getElementByIdPromise("enus", 30);
-    let btnUs = await getElementByIdPromise("us", 30);
+    let btnPair1 = await getElementByIdPromise("pair1", 30);
+    let btnPair2 = await getElementByIdPromise("pair2", 30);
+    let btnHl1 = await getElementByIdPromise("lang1", 30);
+    let btnGl1 = await getElementByIdPromise("location1", 30);
+    let btnHl2 = await getElementByIdPromise("lang2", 30);
+    let btnGl2 = await getElementByIdPromise("location2", 30);
     let btnCh1 = await getElementByIdPromise("ch1", 30);
     let btnCh2 = await getElementByIdPromise("ch2", 30);
+    let btnSetPair1 = await getElementByIdPromise("set_pair1", 30);
+    let btnSetPair2 = await getElementByIdPromise("set_pair2", 30);
     let btnSetCh1 = await getElementByIdPromise("set_ch1", 30);
     let btnSetCh2 = await getElementByIdPromise("set_ch2", 30);
-    let btnSetChDisp = await getElementByIdPromise("set_ch_disp", 30);
+    let btnDispOption = await getElementByIdPromise("disp_option", 30);
+
+    let hl1, hl2, gl1, gl2;
 
     let btnColorReset = () => {
-        btnJa.style.backgroundColor = "";
-        btnJp.style.backgroundColor = "";
-        btnEnus.style.backgroundColor = "";
-        btnUs.style.backgroundColor = "";
+        btnHl1.style.backgroundColor = "";
+        btnGl1.style.backgroundColor = "";
+        btnHl2.style.backgroundColor = "";
+        btnGl2.style.backgroundColor = "";
+    };
+
+    let updateBtnColor = () => {
+        btnColorReset();
+        dlog("hl: ", hl, ", ", hl1, hl2);
+        dlog("gl: ", gl, ", ", gl1, gl2);
+        if (hl == hl1) setPink(btnHl1);
+        if (hl == hl2) setPink(btnHl2);
+        if (gl == gl1) setPink(btnGl1);
+        if (gl == gl2) setPink(btnGl2);
     };
 
     let setPink = async (e) => {
@@ -85,12 +99,66 @@ var main = async () => {
     // 最初に設定読み込み、表示
     ///////////////////////////////////////////////////////////////////////
 
+    // 言語・場所表示名
+    let dispName = (str) => {
+        const dispList = {
+            ja: "日本語",
+            JP: "日本",
+            en: "English (US)",
+            US: "United States",
+        };
+        return dispList[str] ?? str;
+    };
+
+    let setBtnLabels = (hl1, hl2, gl1, gl2) => {
+        let dhl1 = dispName(hl1);
+        let dhl2 = dispName(hl2);
+        let dgl1 = dispName(gl1);
+        let dgl2 = dispName(gl2);
+        btnPair1.innerHTML = `${dhl1}</br>+ ${dgl1}`;
+        btnPair2.innerHTML = `${dhl2}</br>+ ${dgl2}`;
+        btnHl1.innerHTML = `${dhl1}`;
+        btnHl2.innerHTML = `${dhl2}`;
+        btnGl1.innerHTML = `${dgl1}`;
+        btnGl2.innerHTML = `${dgl2}`;
+    };
+
+    let loadPairs = async () => {
+        ({ hl1, hl2, gl1, gl2 } = await chrome.storage.local.get([
+            "hl1",
+            "hl2",
+            "gl1",
+            "gl2",
+        ]));
+        hl1 ??= "ja";
+        hl2 ??= "en";
+        gl1 ??= "JP";
+        gl2 ??= "US";
+        setBtnLabels(hl1, hl2, gl1, gl2);
+    };
+
+    let setPair1 = async (ahl, agl) => {
+        await chrome.storage.local.set({ hl1: ahl, gl1: agl });
+        await loadPairs();
+        updateBtnColor();
+    };
+
+    let setPair2 = async (ahl, agl) => {
+        await chrome.storage.local.set({ hl2: ahl, gl2: agl });
+        await loadPairs();
+        updateBtnColor();
+    };
+
+    await loadPairs();
+    updateBtnColor();
+
+    // cookie PREF の 言語 hl, 場所 gl を変更
     // ahl: 言語(h???? language)
     // agl: 場所(global location)
     let setPref = async (ahl, agl) => {
         // 値設定
-        hl = ahl || hl;
-        gl = agl || gl;
+        hl = ahl ?? hl;
+        gl = agl ?? gl;
         dlog(params.get("hl"), params.get("gl"));
         params.set("hl", hl);
         params.set("gl", gl);
@@ -99,27 +167,10 @@ var main = async () => {
 
         // 設定した値を取得して確認、表示反映
         await loadPref();
-        btnColorReset();
-        switch (hl) {
-            case "ja":
-                setPink(btnJa);
-                break;
-            case "en_US":
-                setPink(btnEnus);
-                break;
-        }
-        switch (gl) {
-            case "JP":
-                setPink(btnJp);
-                break;
-            case "US":
-                setPink(btnUs);
-                break;
-        }
+        updateBtnColor();
     };
 
-    let { ch1 } = await chrome.storage.local.get("ch1");
-    let { ch2 } = await chrome.storage.local.get("ch2");
+    let { ch1, ch2 } = await chrome.storage.local.get(["ch1", "ch2"]);
 
     let setLoginInfo = async (val) => {
         loginInfo.value = val;
@@ -147,49 +198,12 @@ var main = async () => {
     //////////////////////////////////////////////////////////////////////
     // ボタンクリックイベント
     //////////////////////////////////////////////////////////////////////
-    btnJaJp.addEventListener(
-        "click",
-        () => {
-            setPref("ja", "JP");
-        },
-        true
-    );
-
-    btnEnusUs.addEventListener(
-        "click",
-        () => {
-            setPref("en_US", "US");
-        },
-        true
-    );
-    btnJa.addEventListener(
-        "click",
-        () => {
-            setPref("ja");
-        },
-        true
-    );
-    btnJp.addEventListener(
-        "click",
-        () => {
-            setPref(undefined, "JP");
-        },
-        true
-    );
-    btnEnus.addEventListener(
-        "click",
-        () => {
-            setPref("en_US");
-        },
-        true
-    );
-    btnUs.addEventListener(
-        "click",
-        () => {
-            setPref(undefined, "US");
-        },
-        true
-    );
+    btnPair1.addEventListener("click", () => setPref(hl1, gl1), true);
+    btnPair2.addEventListener("click", () => setPref(hl2, gl2), true);
+    btnHl1.addEventListener("click", () => setPref(hl1), true);
+    btnGl1.addEventListener("click", () => setPref(undefined, gl1), true);
+    btnHl2.addEventListener("click", () => setPref(hl2), true);
+    btnGl2.addEventListener("click", () => setPref(undefined, gl2), true);
 
     btnCh1.addEventListener(
         "click",
@@ -215,16 +229,40 @@ var main = async () => {
         true
     );
 
-    btnSetChDisp.addEventListener(
+    btnDispOption.addEventListener(
         "click",
         () => {
             let option = document.getElementById("option");
             option.hidden = !option.hidden;
             if (option.hidden) {
-                btnSetChDisp.innerText = "数字ボタン設定を表示";
+                btnDispOption.innerText = "ボタン割り当て設定を表示";
             } else {
-                btnSetChDisp.innerText = "数字ボタン設定を隠す";
+                btnDispOption.innerText = "ボタン割り当て設定を隠す";
             }
+        },
+        true
+    );
+
+    btnSetPair1.addEventListener(
+        "click",
+        async () => {
+            await loadPref();
+            await setPair1(hl, gl);
+            alert(
+                `左ボタンに${dispName(hl)} + ${dispName(gl)} を割り当てました。`
+            );
+        },
+        true
+    );
+
+    btnSetPair2.addEventListener(
+        "click",
+        async () => {
+            await loadPref();
+            await setPair2(hl, gl);
+            alert(
+                `右ボタンに${dispName(hl)} + ${dispName(gl)} を割り当てました。`
+            );
         },
         true
     );
