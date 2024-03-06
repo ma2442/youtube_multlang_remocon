@@ -3,7 +3,7 @@
 // youtube data api v3 で を取得するスクリプト
 
 var main = async () => {
-    let debug = true;
+    let debug = false;
     let dlog = function (...args) {
         if (debug) console.log(...args);
     };
@@ -104,8 +104,12 @@ var main = async () => {
         const dispList = {
             ja: "日本語",
             JP: "日本",
+            KR: "Korea",
             en: "English (US)",
             US: "United States",
+            DZ: "Algeria",
+            AR: "Argentina",
+            AU: "Australia",
         };
         return dispList[str] ?? str;
     };
@@ -194,6 +198,18 @@ var main = async () => {
     await loadPref();
     await setPref();
     await loadLoginInfo();
+
+    // デバッグ用表示
+    let inserted;
+    if (debug)
+        (function createDebugInfo() {
+            // 要素生成して追加
+            inserted = document.createElement("input");
+            inserted.id = "debug";
+            document.body.appendChild(inserted);
+            loadPref();
+            inserted.value = "言語 " + hl + "   国 " + gl;
+        })();
 
     //////////////////////////////////////////////////////////////////////
     // ボタンクリックイベント
