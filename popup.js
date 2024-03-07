@@ -1,11 +1,30 @@
 "use strict";
-// 現在開いているタブページのurl取得
-// youtube data api v3 で を取得するスクリプト
+// youtubeのCookieを取得、書き換えてCh,言語,場所の設定を操作するスクリプト
 
 var main = async () => {
+    //////////////////////////////////////////////////////////////////
+    // ユーティリティ部
+    //////////////////////////////////////////////////////////////////
     let debug = false;
     let dlog = function (...args) {
         if (debug) console.log(...args);
+    };
+
+    // ex: zip([a,b,c], [A,B,C], [0,1,2] )
+    //    return [ [a,A,0], [b,B,1], [c,C,2] ]
+    let zip = (...arrays) => {
+        const len = Math.min(...arrays.map((ar) => ar.length));
+        let zipped = [];
+        for (let i = 0; i < len; i++) {
+            zipped.push(arrays.map((ar) => ar[i]));
+        }
+        return zipped;
+    };
+
+    // ex: [a,b,c].zip( [A,B,C], [0,1,2] )
+    //    return [ [a,A,0], [b,B,1], [c,C,2] ]
+    Array.prototype.zip = function (...arrays) {
+        return zip(this, ...arrays);
     };
 
     // getElementByIdを指定回数リトライ Promiseを返す。
@@ -21,38 +40,106 @@ var main = async () => {
         return getElementByIdPromise(id, triesMax - 1);
     };
 
-    let btnPair1 = await getElementByIdPromise("pair1", 30);
-    let btnPair2 = await getElementByIdPromise("pair2", 30);
-    let btnHl1 = await getElementByIdPromise("lang1", 30);
-    let btnGl1 = await getElementByIdPromise("location1", 30);
-    let btnHl2 = await getElementByIdPromise("lang2", 30);
-    let btnGl2 = await getElementByIdPromise("location2", 30);
-    let btnCh1 = await getElementByIdPromise("ch1", 30);
-    let btnCh2 = await getElementByIdPromise("ch2", 30);
-    let btnSetPair1 = await getElementByIdPromise("set_pair1", 30);
-    let btnSetPair2 = await getElementByIdPromise("set_pair2", 30);
-    let btnSetCh1 = await getElementByIdPromise("set_ch1", 30);
-    let btnSetCh2 = await getElementByIdPromise("set_ch2", 30);
-    let btnDispOption = await getElementByIdPromise("disp_option", 30);
-
-    let hl1, hl2, gl1, gl2;
-
-    let btnColorReset = () => {
-        btnHl1.style.backgroundColor = "";
-        btnGl1.style.backgroundColor = "";
-        btnHl2.style.backgroundColor = "";
-        btnGl2.style.backgroundColor = "";
+    // SelectタグにOption要素を追加するメソッド
+    HTMLElement.prototype.addOption = function (val, label) {
+        let opt = document.createElement("option");
+        opt.value = val;
+        opt.label = label;
+        this.appendChild(opt);
     };
 
-    let updateBtnColor = () => {
-        btnColorReset();
-        dlog("hl: ", hl, ", ", hl1, hl2);
-        dlog("gl: ", gl, ", ", gl1, gl2);
-        if (hl == hl1) setPink(btnHl1);
-        if (hl == hl2) setPink(btnHl2);
-        if (gl == gl1) setPink(btnGl1);
-        if (gl == gl2) setPink(btnGl2);
+    // batch情報(ch, lang, location のlabel, valueキーを持つ連想配列)と
+    // label、ボタンidxを持たせたボタンタグを追加するメソッド
+    HTMLElement.prototype.addButton = function (batch, label, idx) {
+        let btn = document.createElement("button");
+        btn.batch = batch;
+        btn.innerHTML = label;
+        btn.idx = idx;
+
+        // ボタン動作追加
+        btn.addEventListener(
+            "click",
+            async (e) => {
+                // ワンタッチボタン削除モードの挙動
+                if (delBatchCheck.checked) {
+                    if (
+                        window.confirm(
+                            `「${e.target.innerHTML}」を削除しますか？`
+                        )
+                    ) {
+                        let { batches } = await chrome.storage.local.get(
+                            "batches"
+                        );
+                        batches ??= [];
+                        batches.splice(e.target.idx, 1);
+                        await chrome.storage.local.set({ batches: batches });
+                        await updateBatchBtns();
+                    }
+                    return;
+                }
+
+                // ワンタッチボタン通常モードの挙動
+                // Ch Cookie変更
+                // location Cookie, lang Cookie変更
+                if (btn.batch.ch.value) await setLoginInfo(btn.batch.ch.value);
+                gl = btn.batch.location || gl;
+                hl = btn.batch.lang || hl;
+                setPref(hl, gl);
+
+                // 更新
+                reloadActiveTab();
+                window.close();
+                return;
+            },
+            true
+        );
+        this.appendChild(btn);
     };
+    // ユーティリティ部 終了
+    ////////////////////////////////////////////////////////////////////////////
+
+    let locationSelect = await getElementByIdPromise("location_select", 30);
+    let langSelect = await getElementByIdPromise("lang_select", 30);
+    let chSelect = await getElementByIdPromise("ch_select", 30);
+
+    // 場所・言語削除ボタン
+    let btnLocationDel = await getElementByIdPromise("location_del", 30);
+    let btnLangDel = await getElementByIdPromise("lang_del", 30);
+
+    // チャンネル追加・削除ボタン
+    let btnChDel = await getElementByIdPromise("ch_del", 30);
+    let btnChAdd = await getElementByIdPromise("ch_add", 30);
+
+    // 設定反映ボタン
+    let btnReload = await getElementByIdPromise("reload", 30);
+
+    // 「ワンタッチボタンに登録」ボタン
+    let btnAddBatch = await getElementByIdPromise("add_batch", 30);
+
+    // 設定選択セクションの編集モードチェックボックス
+    let editCheck = await getElementByIdPromise("edit_check", 30);
+
+    // ワンタッチボタン群
+    let batchBtns = await getElementByIdPromise("batch_btns", 30);
+
+    // ワンタッチボタン削除モードチェックボックス
+    let delBatchCheck = await getElementByIdPromise("del_batch_check", 30);
+
+    // データ移行セクションのタグ群
+    let migrationMenu = await getElementByIdPromise("migration_menu", 30);
+    let btnClearAllData = await getElementByIdPromise("clear_all_data", 30);
+    let btnCopyAllData = await getElementByIdPromise("copy_all_data", 30);
+    let textAllData = await getElementByIdPromise("all_data", 30);
+    let btnImportAllData = await getElementByIdPromise("import_all_data", 30);
+
+    // データ移行メニュー表示チェックボックス
+    let dispMigrationMenuCheck = await getElementByIdPromise(
+        "disp_migration_menu_check",
+        30
+    );
+
+    // 選択項目の現在値識別用チェックマーク
+    const checkmark = "✅";
 
     let setPink = async (e) => {
         e.style.backgroundColor = "pink";
@@ -114,48 +201,6 @@ var main = async () => {
         return dispList[str] ?? str;
     };
 
-    let setBtnLabels = (hl1, hl2, gl1, gl2) => {
-        let dhl1 = dispName(hl1);
-        let dhl2 = dispName(hl2);
-        let dgl1 = dispName(gl1);
-        let dgl2 = dispName(gl2);
-        btnPair1.innerHTML = `${dhl1}</br>+ ${dgl1}`;
-        btnPair2.innerHTML = `${dhl2}</br>+ ${dgl2}`;
-        btnHl1.innerHTML = `${dhl1}`;
-        btnHl2.innerHTML = `${dhl2}`;
-        btnGl1.innerHTML = `${dgl1}`;
-        btnGl2.innerHTML = `${dgl2}`;
-    };
-
-    let loadPairs = async () => {
-        ({ hl1, hl2, gl1, gl2 } = await chrome.storage.local.get([
-            "hl1",
-            "hl2",
-            "gl1",
-            "gl2",
-        ]));
-        hl1 ??= "ja";
-        hl2 ??= "en";
-        gl1 ??= "JP";
-        gl2 ??= "US";
-        setBtnLabels(hl1, hl2, gl1, gl2);
-    };
-
-    let setPair1 = async (ahl, agl) => {
-        await chrome.storage.local.set({ hl1: ahl, gl1: agl });
-        await loadPairs();
-        updateBtnColor();
-    };
-
-    let setPair2 = async (ahl, agl) => {
-        await chrome.storage.local.set({ hl2: ahl, gl2: agl });
-        await loadPairs();
-        updateBtnColor();
-    };
-
-    await loadPairs();
-    updateBtnColor();
-
     // cookie PREF の 言語 hl, 場所 gl を変更
     // ahl: 言語(h???? language)
     // agl: 場所(global location)
@@ -171,7 +216,6 @@ var main = async () => {
 
         // 設定した値を取得して確認、表示反映
         await loadPref();
-        updateBtnColor();
     };
 
     let { ch1, ch2 } = await chrome.storage.local.get(["ch1", "ch2"]);
@@ -182,7 +226,7 @@ var main = async () => {
     };
 
     // アクティブタブにリロード用スクリプトを埋め込む
-    let tabReload = async () => {
+    let reloadActiveTab = async () => {
         let tabs = await chrome.tabs.query({
             active: true,
             currentWindow: true,
@@ -200,121 +244,367 @@ var main = async () => {
     await loadLoginInfo();
 
     // デバッグ用表示
-    let inserted;
-    if (debug)
+    let dinput;
+    if (debug) {
         (function createDebugInfo() {
             // 要素生成して追加
-            inserted = document.createElement("input");
-            inserted.id = "debug";
-            document.body.appendChild(inserted);
+            dinput = document.createElement("input");
+            dinput.id = "debug";
+            document.body.appendChild(dinput);
             loadPref();
-            inserted.value = "言語 " + hl + "   国 " + gl;
+            dinput.value = "言語 " + hl + "   国 " + gl;
         })();
+    }
+
+    loadPref();
+
+    let loadList = async (key) => {
+        let list = await chrome.storage.local.get(`${key}`);
+        list = list[key];
+        dlog("list: ", list);
+        return list ?? [];
+    };
+
+    let delFromList = async (listKey, i) => {
+        let list = await loadList(listKey);
+        list.splice(i, 1);
+        let keyVals = {};
+        keyVals[listKey] = list;
+        await chrome.storage.local.set(keyVals);
+        await updateSelectList(listKey);
+        dlog("list after delete: ", list);
+    };
+
+    // ストレージ内の指定したリストに値を追加する関数
+    let storeValueToList = async (listKey, value) => {
+        let list = await loadList(listKey);
+
+        if (value && !list.includes(value)) {
+            dlog(value);
+            list.push(value);
+            let keyVals = {};
+            keyVals[listKey] = list;
+            await chrome.storage.local.set(keyVals);
+        }
+        return list;
+    };
+
+    // listKeyからSelectタグとCurValを紐づけ
+    let curSetting = (key) => {
+        if (key == "locations") {
+            return {
+                selectList: locationSelect,
+                curVal: gl,
+            };
+        }
+        if (key == "langs") {
+            return {
+                selectList: langSelect,
+                curVal: hl,
+            };
+        }
+    };
+
+    // SelectタグにList反映
+    let updateSelectList = async (listKey) => {
+        // どのリストに対しての操作か？
+        let { selectList, curVal } = curSetting(listKey);
+
+        let list = await loadList(listKey);
+
+        // 表示するリストのOptionタグを作成
+        selectList.innerHTML = "";
+        for (const e of list) {
+            dlog(selectList instanceof HTMLElement);
+            selectList.addOption(e, dispName(e));
+        }
+
+        // 現在の設定値にチェックマークをつける。
+        let curIdx = list.indexOf(curVal);
+        dlog("listKey, curVal, curIdx: ", listKey, curVal, curIdx);
+        // selectList.selectedIndex = curIdx;
+        if (curIdx == -1) return;
+
+        selectList.options[curIdx].label =
+            checkmark + selectList.options[curIdx].label;
+    };
+
+    // ストレージの指定したリストに現在の設定値を追加する関数
+    let addCurValToListAndUpdateDisp = async (listKey) => {
+        dlog("listKey: ", listKey);
+        dlog("curSetting(listKey): ", curSetting(listKey));
+        let list = await storeValueToList(listKey, curSetting(listKey).curVal);
+        await updateSelectList(listKey);
+    };
+
+    // Chリスト更新
+    let updateChList = async () => {
+        let selectList = chSelect;
+        // chListは value, label をもつ。
+        let chList = await loadList("chs");
+
+        // 表示するリストのOptionタグを作成
+        selectList.innerHTML = "";
+        for (const e of chList) {
+            dlog(selectList instanceof HTMLElement);
+            selectList.addOption(e.value, e.label);
+        }
+
+        // 現在の設定値にチェックマークをつける。
+        await loadLoginInfo();
+        let curVal = loginInfo.value;
+        let curIdx = chList.map((ch) => ch.value).indexOf(curVal);
+        dlog("curVal, curIdx: ", curVal, curIdx);
+        if (curIdx == -1) return;
+        selectList.options[curIdx].label =
+            checkmark + selectList.options[curIdx].label;
+    };
+
+    // ボタンラベルに成形
+    let genBatchBtnLabel = (batch) =>
+        [batch.ch.label, dispName(batch.lang), dispName(batch.location)].join(
+            " / "
+        );
+
+    // ボタンリスト更新
+    let updateBatchBtns = async () => {
+        let { batches } = await chrome.storage.local.get("batches");
+        batches ??= [];
+        batchBtns.innerHTML = "";
+        batches.map((e, i) => {
+            dlog("batch: ", e);
+            batchBtns.addButton(e, genBatchBtnLabel(e), i);
+        });
+    };
+
+    // init location and langs SelectLists
+    await addCurValToListAndUpdateDisp("locations");
+    await addCurValToListAndUpdateDisp("langs");
+
+    await updateChList();
+    await updateBatchBtns();
 
     //////////////////////////////////////////////////////////////////////
     // ボタンクリックイベント
     //////////////////////////////////////////////////////////////////////
-    btnPair1.addEventListener("click", () => setPref(hl1, gl1), true);
-    btnPair2.addEventListener("click", () => setPref(hl2, gl2), true);
-    btnHl1.addEventListener("click", () => setPref(hl1), true);
-    btnGl1.addEventListener("click", () => setPref(undefined, gl1), true);
-    btnHl2.addEventListener("click", () => setPref(hl2), true);
-    btnGl2.addEventListener("click", () => setPref(undefined, gl2), true);
-
-    btnCh1.addEventListener(
+    btnLocationDel.addEventListener(
         "click",
         async () => {
-            ({ ch1 } = await chrome.storage.local.get("ch1"));
-            dlog("ch1: ", ch1);
-            await setLoginInfo(ch1);
-            tabReload();
-            window.close();
+            let i = locationSelect.selectedIndex;
+            if (i != -1) await delFromList("locations", i);
+        },
+        true
+    );
+    btnLangDel.addEventListener(
+        "click",
+        async () => {
+            let i = langSelect.selectedIndex;
+            if (i != -1) await delFromList("langs", i);
         },
         true
     );
 
-    btnCh2.addEventListener(
+    // Ch リストから削除する
+    btnChDel.addEventListener(
         "click",
         async () => {
-            ({ ch2 } = await chrome.storage.local.get("ch2"));
-            dlog("ch2: ", ch2);
-            await setLoginInfo(ch2);
-            tabReload();
-            window.close();
-        },
-        true
-    );
-
-    btnDispOption.addEventListener(
-        "click",
-        () => {
-            let option = document.getElementById("option");
-            option.hidden = !option.hidden;
-            if (option.hidden) {
-                btnDispOption.innerText = "ボタン割り当て設定を表示";
-            } else {
-                btnDispOption.innerText = "ボタン割り当て設定を隠す";
+            let i = chSelect.selectedIndex;
+            if (i == -1) {
+                return;
             }
+            let chList = await loadList("chs");
+            chList.splice(i, 1);
+            await chrome.storage.local.set({ chs: chList });
+            await updateChList();
         },
         true
     );
 
-    btnSetPair1.addEventListener(
+    // Ch リストに追加する
+    btnChAdd.addEventListener(
         "click",
         async () => {
-            await loadPref();
-            await setPair1(hl, gl);
-            alert(
-                `左ボタンに${dispName(hl)} + ${dispName(gl)} を割り当てました。`
-            );
-        },
-        true
-    );
-
-    btnSetPair2.addEventListener(
-        "click",
-        async () => {
-            await loadPref();
-            await setPair2(hl, gl);
-            alert(
-                `右ボタンに${dispName(hl)} + ${dispName(gl)} を割り当てました。`
-            );
-        },
-        true
-    );
-
-    btnSetCh1.addEventListener(
-        "click",
-        async () => {
+            // ChのCookie取得
+            let chList = await loadList("chs");
             await loadLoginInfo();
-            ch1 = loginInfo.value;
-            await chrome.storage.local.set({ ch1: ch1 });
-            ({ ch1 } = await chrome.storage.local.get("ch1"));
-            dlog("ch1: ", ch1);
-            alert("ボタン１に割り当てました。");
+            let ch = { label: "", value: loginInfo.value };
+
+            // 重複チェック
+            const sameChs = chList.filter((e) => e.value == loginInfo.value);
+            if (sameChs[0]) {
+                alert(
+                    `このChは「${sameChs[0].label}」という名前で登録済みです。`
+                );
+                return;
+            }
+
+            // Ch表示名決定、登録、リスト更新
+            ch.label = window.prompt("Chの名前を決めてください。", "");
+            if (!ch.label) return;
+            if (chList.some((e) => e.label == ch.label)) {
+                alert(`「${ch.label}」という名前はすでに使われています。`);
+                return;
+            }
+            chList.push(ch);
+            await chrome.storage.local.set({ chs: chList });
+            await updateChList();
         },
         true
     );
 
-    btnSetCh2.addEventListener(
+    // 設定反映ボタン
+    btnReload.addEventListener(
         "click",
         async () => {
-            await loadLoginInfo();
-            ch2 = loginInfo.value;
-            await chrome.storage.local.set({ ch2: ch2 });
-            ({ ch2 } = await chrome.storage.local.get("ch2"));
-            dlog("ch2: ", ch2);
-            alert("ボタン２に割り当てました。");
+            // Ch Cookie変更
+            {
+                let i = chSelect.selectedIndex;
+                dlog("chSelect.selectedIndex: ", i);
+                if (i != -1) await setLoginInfo(chSelect.options[i].value);
+            }
+            // location Cookie, lang Cookie変更
+            {
+                let i = locationSelect.selectedIndex;
+                dlog("locationSelect.selectedIndex: ", i);
+                if (i != -1) gl = locationSelect.options[i].value;
+            }
+            {
+                let i = langSelect.selectedIndex;
+                dlog("langSelect.selectedIndex: ", i);
+                if (i != -1) hl = langSelect.options[i].value;
+            }
+            setPref(hl, gl);
+
+            // 更新
+            reloadActiveTab();
+            window.close();
+            return;
         },
         true
+    );
+
+    // 設定をワンタッチボタンとして追加
+    btnAddBatch.addEventListener(
+        "click",
+        async () => {
+            //Ch 選択項目取得
+            let batch = {};
+            {
+                let i = chSelect.selectedIndex;
+                dlog("chSelect.selectedIndex: ", i);
+                if (i != -1) {
+                    const list = await loadList("chs");
+                    batch.ch = list[i];
+                }
+            }
+            // location, lang 選択項目取得
+            {
+                let i = locationSelect.selectedIndex;
+                dlog("locationSelect.selectedIndex: ", i);
+                if (i != -1) {
+                    let list = await loadList("locations");
+                    batch.location = list[i];
+                }
+            }
+            {
+                let i = langSelect.selectedIndex;
+                dlog("langSelect.selectedIndex: ", i);
+                if (i != -1) {
+                    let list = await loadList("langs");
+                    batch.lang = list[i];
+                }
+            }
+            if (!batch.ch || !batch.location || !batch.lang) {
+                alert(
+                    "Ch, 言語, 場所のいずれかが選択されていないため、" +
+                        "ボタン追加できません。\n"
+                );
+                return;
+            }
+
+            // バッチボタンリスト取得、追加、更新
+            let { batches } = await chrome.storage.local.get("batches");
+            batches ??= [];
+            dlog("batches: ", batches);
+            dlog("batch: ", batch);
+            const btnLabel = genBatchBtnLabel(batch);
+            dlog("btnLabel: ", btnLabel);
+            if (batches.map((b) => genBatchBtnLabel(b)).includes(btnLabel)) {
+                alert(`「 ${btnLabel} 」 は既に登録されています。`);
+                return;
+            }
+            batches.push(batch);
+            await chrome.storage.local.set({ batches: batches });
+
+            await updateBatchBtns();
+            return;
+        },
+        true
+    );
+
+    // 編集モードチェックボックスの状態変化
+    editCheck.addEventListener("change", (e) =>
+        document
+            .querySelectorAll(".del, #add_batch")
+            .forEach(
+                (item) =>
+                    (item.style.display = e.target.checked ? "inline" : "none")
+            )
+    );
+
+    // 全データをクリップボードへコピーボタン
+    btnCopyAllData.addEventListener(
+        "click",
+        async () => {
+            const data = await chrome.storage.local.get();
+            dlog("alldata: ", data);
+            textAllData.value = JSON.stringify(data);
+            navigator.clipboard.writeText(JSON.stringify(data));
+            alert("コピーしました！");
+            return;
+        },
+        true
+    );
+
+    // テキストエリアからデータをインポート
+    btnImportAllData.addEventListener(
+        "click",
+        async () => {
+            if (
+                !window.confirm(
+                    "全データをテキストより読み込みます。" + "実行しますか？"
+                )
+            )
+                return;
+            const data = JSON.parse(textAllData.value);
+            await chrome.storage.local.set(data);
+            window.close();
+            return;
+        },
+        true
+    );
+
+    // 全データ消去
+    btnClearAllData.addEventListener(
+        "click",
+        async () => {
+            if (!window.confirm("全データを消去します。本当によろしいですか？"))
+                return;
+            await chrome.storage.local.clear();
+            window.close();
+        },
+        true
+    );
+
+    // データ移行メニューを表示 チェックボックスの状態変化
+    dispMigrationMenuCheck.addEventListener(
+        "change",
+        (e) =>
+            (migrationMenu.style.display = e.target.checked ? "block" : "none")
     );
 
     //////////////////////////////////////////////////////////////////
     // イベントハンドラー、イベントリスナー
-    //////////////////////////////////////////////////////////////////
-
-    //////////////////////////////////////////////////////////////////
-    // ユーティリティ部
     //////////////////////////////////////////////////////////////////
 
     //////////////////////////////////////////////////////////////////

@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="jp">
 <style>
+    /* 全体用 */
     body {
-        min-width: 320px;
+        min-width: 370px;
         min-height: 50px;
         /* background-color: black; */
     }
@@ -12,10 +13,83 @@
         /* ページのスクロールバーを隠す */
     }
 
-    button {
+    h1,
+    h2 {
+        padding: 0px;
+        margin: 0em 0px 0px 0px;
+        text-align: center;
+    }
+
+    /* Selectリスト群セクション */
+    #selects {
+        margin: 1em 0em 0em 0em;
+        width: 100%;
+        min-height: 7em;
+        /* border: solid 1px; */
+        align-items: start;
+        display: flex;
+    }
+
+    .sel {
+        display: inline-block;
+        _display: inline;
+        width: 10em;
+        height: 100%;
+        margin: 0em 0.2em;
+    }
+
+    .sel_header {
+        /* Ch 言語 場所 のリストの見出しがデフォルトだと
+        英字と日本語で高さが異なるので高さを合わせる */
+        height: 1.5em;
+    }
+
+    .sel>select {
+        font-size: 1em;
+        height: 6em;
+        width: 100%;
+    }
+
+    #buttonUsingSelects {
+        margin: 0em 0em 1em 0em;
+    }
+
+    #buttonUsingSelects>button {
+        width: 100%;
         font-size: 1.5em;
-        min-width: 49%;
-        min-height: 1.5em;
+        height: 1.5em;
+        padding: 0px;
+        margin: 3px 0px 0px 0px;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .sel>button.del {
+        margin: 5px 0px 0px 0px;
+    }
+
+    .del,
+    #add_batch {
+        display: none;
+    }
+
+    /* ワンタッチボタンセクション */
+    #batch {
+        background-color: palegreen;
+        margin: 0em 0em 1em 0em;
+    }
+
+    #batch_btns {
+        width: 100%;
+    }
+
+    #batch_btns>* {
+        width: 100%;
+    }
+
+    #batch_btns>button {
+        font-size: 1.5em;
+        height: 2em;
         padding: 0px;
         margin: 3px 0px 0px 0px;
         /* background-color: #5aa; */
@@ -24,31 +98,29 @@
         vertical-align: middle;
     }
 
-    .ch {
-        font-size: 3em;
-        height: 1.5em;
+    /* データ移行メニューセクション */
+    #migration_menu {
+        width: 100%;
     }
 
-    .pair {
+    #migration_menu>* {
+        width: 100%;
+    }
+
+    #migration_menu>button {
         font-size: 1.5em;
-        height: 3em;
-    }
-
-    .setting {
-        height: 1.5em;
-    }
-
-    h1,
-    h2 {
-        padding: 0px;
-        margin: 10px 0px 0px 0px;
-        text-align: center;
-    }
-
-    #disp_option {
-        font-size: 1em;
-        min-width: 1em;
         min-height: 1em;
+        padding: 0px;
+        margin: 3px 0px 0px 0px;
+        /* background-color: #5aa; */
+        /* border: none; */
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    textarea {
+        width: 200px;
+        height: 300px;
     }
 </style>
 
@@ -58,31 +130,54 @@
 </head>
 
 <body>
-    <h1>ペア設定</h1>
-    <button class="pair" id="pair1">日本語 <br>+ 日本</button>
-    <button class="pair" id="pair2">English (US) <br>+ United States</button>
-    <br>
-    <h1>Ch切替＆更新</h1>
-    <button class="ch" id="ch1">1</button>
-    <button class="ch" id="ch2">2</button>
-    <br>
-    <h2>個別設定・現在の設定値</h2>
-    <button class="setting" id="lang1">日本語</button>
-    <button class="setting" id="lang2">English (US)</button>
-    <br>
-    <button class="setting" id="location1">日本</button>
-    <button class="setting" id="location2">United States</button>
-    <br>
-    <br><br>
-    <button id="disp_option">ボタン割り当て設定を表示</button>
-    <div id="option" hidden="true">
-        <h3>表示中の言語・場所のペアをボタンに割り当て</h3>
-        <button id="set_pair1">左ボタンに設定</button>
-        <button id="set_pair2">右ボタンに設定</button>
-        <h3>表示中Chを数字ボタンに割り当て</h3>
-        <button id="set_ch1">1に設定</button>
-        <button id="set_ch2">2に設定</button>
+    <div id="selects">
+        <section class="sel">
+            <h2 class="sel_header">Ch</h2>
+            <select name="" size="4" id="ch_select"></select>
+            <button id="ch_del" class="del">削除</button>
+            <button id="ch_add" class="del">追加</button>
+        </section>
+        <section class="sel">
+            <h2 class="sel_header">言語</h2>
+            <select name="" size="4" id="lang_select"></select>
+            <button id="lang_del" class="del">削除</button>
+        </section>
+        <section class="sel">
+            <h2 class="sel_header">場所</h2>
+            <select name="" size="4" id="location_select"></select>
+            <button id="location_del" class="del">削除</button>
+        </section>
     </div>
+
+    <div id="buttonUsingSelects">
+        <button id="reload">選んだ設定を反映</button>
+        <button id="add_batch">選んだ設定をワンタッチボタンに追加</button>
+        <label><input type="checkbox" id="edit_check">編集モード</label>
+    </div>
+
+    <section id="batch">
+        <h2>ワンタッチボタン</h2>
+        <div id="batch_btns">
+        </div>
+        <label><input type="checkbox" id="del_batch_check">削除モード</label>
+    </section>
+
+    <aside id="additional">
+        <label>
+            <input type="checkbox" id="disp_migration_menu_check">
+            データ移行メニューを表示
+        </label>
+    </aside>
+
+    <section id="migration_menu" style="display:none">
+        <h2>データ操作</h2>
+        <button id="copy_all_data">全データをクリップボードへコピー</button>
+        <button id="import_all_data">全データをテキストからインポート</button>
+        インポートするデータを下のテキストエリアに貼り付けてください。
+        <textarea id="all_data"></textarea>
+        <button id="clear_all_data">全消去</button>
+    </section>
+
     <script src="popup.js"></script>
 </body>
 <style type="text/css"></style>
