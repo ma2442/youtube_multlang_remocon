@@ -4,7 +4,7 @@
     "description": "Youtubeの言語・場所・アカウントの切替を楽にできる。",
     // "name": "Youtube Multi-Language Remocon",
     // "description": "switch languages and countries on youtube",
-    "version": "0.3.0",
+    "version": "0.6.5",
 
     "action": {
         "default_title": "Youtube多言語リモコン",

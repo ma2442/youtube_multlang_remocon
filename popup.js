@@ -79,9 +79,9 @@ var main = async () => {
                 }
 
                 // ワンタッチボタン通常モードの挙動
-                // Ch Cookie変更
+                // Ch 変更後名保存
                 // location Cookie, lang Cookie変更
-                if (btn.batch.ch.value) await setLoginInfo(btn.batch.ch.value);
+                if (btn.batch.ch.label) await setCh(btn.batch.ch.label);
                 gl = btn.batch.location || gl;
                 hl = btn.batch.lang || hl;
                 setPref(hl, gl);
@@ -164,14 +164,6 @@ var main = async () => {
         gl = params.get("gl");
     };
 
-    let loginInfo;
-    let loadLoginInfo = async () => {
-        loginInfo = await chrome.cookies.get({
-            url: "https://*.youtube.com/",
-            name: "LOGIN_INFO",
-        });
-    };
-
     // cookies.setに渡せないプロパティ削除, 必須プロパティ追加
     let formingForSet = (cookie) => {
         delete cookie.hostOnly;
@@ -220,9 +212,9 @@ var main = async () => {
 
     let { ch1, ch2 } = await chrome.storage.local.get(["ch1", "ch2"]);
 
-    let setLoginInfo = async (val) => {
-        loginInfo.value = val;
-        await chrome.cookies.set(formingForSet(loginInfo));
+    let setCh = async (val) => {
+        await chrome.storage.local.set({ ch: val });
+        dlog((await chrome.storage.local.get("ch")).ch);
     };
 
     // アクティブタブにリロード用スクリプトを埋め込む
@@ -231,8 +223,7 @@ var main = async () => {
             active: true,
             currentWindow: true,
         });
-        dlog(tabs);
-
+        dlog("tabs:", tabs);
         chrome.scripting.executeScript({
             target: { tabId: tabs[0].id },
             files: ["scripting.js"],
@@ -241,7 +232,6 @@ var main = async () => {
 
     await loadPref();
     await setPref();
-    await loadLoginInfo();
 
     // デバッグ用表示
     let dinput;
@@ -349,15 +339,6 @@ var main = async () => {
             dlog(selectList instanceof HTMLElement);
             selectList.addOption(e.value, e.label);
         }
-
-        // 現在の設定値にチェックマークをつける。
-        await loadLoginInfo();
-        let curVal = loginInfo.value;
-        let curIdx = chList.map((ch) => ch.value).indexOf(curVal);
-        dlog("curVal, curIdx: ", curVal, curIdx);
-        if (curIdx == -1) return;
-        selectList.options[curIdx].label =
-            checkmark + selectList.options[curIdx].label;
     };
 
     // ボタンラベルに成形
@@ -424,19 +405,9 @@ var main = async () => {
     btnChAdd.addEventListener(
         "click",
         async () => {
-            // ChのCookie取得
+            // Chリスト取得
             let chList = await loadList("chs");
-            await loadLoginInfo();
-            let ch = { label: "", value: loginInfo.value };
-
-            // 重複チェック
-            const sameChs = chList.filter((e) => e.value == loginInfo.value);
-            if (sameChs[0]) {
-                alert(
-                    `このChは「${sameChs[0].label}」という名前で登録済みです。`
-                );
-                return;
-            }
+            let ch = { label: "", value: "" };
 
             // Ch表示名決定、登録、リスト更新
             ch.label = window.prompt("Chの名前を決めてください。", "");
@@ -445,6 +416,7 @@ var main = async () => {
                 alert(`「${ch.label}」という名前はすでに使われています。`);
                 return;
             }
+            ch.value = ch.label;
             chList.push(ch);
             await chrome.storage.local.set({ chs: chList });
             await updateChList();
@@ -456,11 +428,15 @@ var main = async () => {
     btnReload.addEventListener(
         "click",
         async () => {
-            // Ch Cookie変更
+            // Ch 変更
             {
                 let i = chSelect.selectedIndex;
                 dlog("chSelect.selectedIndex: ", i);
-                if (i != -1) await setLoginInfo(chSelect.options[i].value);
+                if (i != -1) {
+                    await setCh(chSelect.options[i].label);
+                } else {
+                    await setCh("");
+                }
             }
             // location Cookie, lang Cookie変更
             {
