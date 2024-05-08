@@ -23,7 +23,7 @@ async function scriptingjs() {
             await new Promise((ok) => setTimeout(ok, 200));
         }
         dlog(msg, ": T I M E O U T !");
-        alert(msg, ": T I M E O U T !");
+        alert(msg + ": T I M E O U T !");
     };
 
     let accountName = (await chrome.storage.local.get("ch")).ch;
@@ -47,7 +47,11 @@ async function scriptingjs() {
     const getAccountLabel = (name) =>
         [
             ...document.querySelectorAll("yt-formatted-string#channel-title"),
-        ].filter((dom) => dom.innerHTML == name)[0];
+        ].filter(
+            (dom) =>
+                dom.innerHTML == name ||
+                dom.querySelector("span").innerHTML == name
+        )[0];
 
     // "アカウントを切り替える"ラベルを見つける
     await asyncWait("find 'アカウントを切り替える'", 5000, () => {
