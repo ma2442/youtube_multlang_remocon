@@ -44,14 +44,17 @@ async function scriptingjs() {
         );
 
     // 指定した名前のアカウントラベルを見つける関数
-    const getAccountLabel = (name) =>
-        [
+    const getAccountLabel = (name) => {
+        const titles = [
             ...document.querySelectorAll("yt-formatted-string#channel-title"),
-        ].filter(
+        ];
+        dlog("getAccountLabel:", titles);
+        return titles.filter(
             (dom) =>
-                dom.innerHTML == name ||
-                dom.querySelector("span").innerHTML == name
+                dom?.innerHTML == name ||
+                dom?.querySelector("span")?.innerHTML == name
         )[0];
+    };
 
     // "アカウントを切り替える"ラベルを見つける
     await asyncWait("find 'アカウントを切り替える'", 5000, () => {
